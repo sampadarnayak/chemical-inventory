@@ -63,7 +63,7 @@ function ListPage() {
                   <td>
                     <button
                       className="delete-btn"
-                      onClick={() => handleDelete(c.id)}
+                      onClick={() => handleDelete(c.serial_no)}
                     >
                       <Trash2 size={16} />
                     </button>
