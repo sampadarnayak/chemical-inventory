@@ -23,10 +23,10 @@ function ListPage() {
   }, []);
 
   // Delete chemical
-  const handleDelete = (id) => {
+  const handleDelete = (serial_no) => {
     if (window.confirm("Are you sure you want to delete this chemical?")) {
       axios
-        .delete(`${API_BASE_URL}/chemicals/${id}`)
+        .delete(`${API_BASE_URL}/chemicals/${serial_no}`)
         .then(() => fetchChemicals()) // refresh list
         .catch((err) => console.error("Error deleting chemical:", err));
     }

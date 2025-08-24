@@ -117,15 +117,25 @@ app.post("/chemicals", async (req, res) => {
 });
 
 // ✅ Delete a chemical
-app.delete("/chemicals/:id", async (req, res) => {
-  const { id } = req.params;
+app.delete("/chemicals/:serial_no", async (req, res) => {
+  const { serial_no } = req.params; // match the route param
   try {
-    await pool.query("DELETE FROM chemicals WHERE serial_no = $1", [serial_no]);
-    res.json({ success: true, message: "Chemical deleted" });
+    const result = await pool.query(
+      "DELETE FROM chemicals WHERE serial_no = $1",
+      [serial_no]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ success: false, message: "Chemical not found" });
+    }
+
+    res.json({ success: true, message: "Chemical deleted successfully" });
   } catch (err) {
-    res.status(500).send(err);
+    console.error("Error deleting chemical:", err);
+    res.status(500).json({ success: false, error: err.message });
   }
 });
+
 
 // ✅ Start server (Render uses PORT env var)
 const PORT = process.env.PORT || 5000;
