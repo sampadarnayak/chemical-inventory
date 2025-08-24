@@ -117,8 +117,10 @@ app.post("/chemicals", async (req, res) => {
 });
 
 // ✅ Delete a chemical
+// Delete a chemical by serial_no
 app.delete("/chemicals/:serial_no", async (req, res) => {
-  const { serial_no } = req.params; // match the route param
+  const { serial_no } = req.params; // get serial_no from URL
+
   try {
     const result = await pool.query(
       "DELETE FROM chemicals WHERE serial_no = $1",
@@ -135,6 +137,7 @@ app.delete("/chemicals/:serial_no", async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
+
 
 
 // ✅ Start server (Render uses PORT env var)

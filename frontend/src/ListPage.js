@@ -1,18 +1,18 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { Trash2 } from "lucide-react"; // ✅ bin icon
+import { Trash2 } from "lucide-react";
 import "./styles/List.css";
-import API_BASE_URL from "./config"; // ✅ import base URL
+import API_BASE_URL from "./config";
 
 function ListPage() {
   const [chemicals, setChemicals] = useState([]);
 
-  // Fetch chemicals
+  // Fetch chemicals from backend
   const fetchChemicals = () => {
     axios
       .get(`${API_BASE_URL}/chemicals`)
       .then((res) => {
-        console.log("Fetched Chemicals:", res.data); // 🔍 debug
+        console.log("Fetched Chemicals:", res.data);
         setChemicals(res.data);
       })
       .catch((err) => console.error("Error fetching chemicals:", err));
@@ -22,12 +22,13 @@ function ListPage() {
     fetchChemicals();
   }, []);
 
-  // Delete chemical
+  // Delete chemical by serial_no
   const handleDelete = (serial_no) => {
+    if (!serial_no) return;
     if (window.confirm("Are you sure you want to delete this chemical?")) {
       axios
         .delete(`${API_BASE_URL}/chemicals/${serial_no}`)
-        .then(() => fetchChemicals()) // refresh list
+        .then(() => fetchChemicals()) // refresh the table after delete
         .catch((err) => console.error("Error deleting chemical:", err));
     }
   };
@@ -52,7 +53,7 @@ function ListPage() {
           <tbody>
             {chemicals.length > 0 ? (
               chemicals.map((c, index) => (
-                <tr key={c.id || index}>
+                <tr key={c.serial_no || index}>
                   <td>{c.serial_no || index + 1}</td>
                   <td>{c.name || "—"}</td>
                   <td>{c.sku || 0}</td>
