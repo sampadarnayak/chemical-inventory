@@ -1,0 +1,65 @@
+/* ✅ Background image */
+.list-background {
+  
+  min-height: 100vh;
+  padding: 40px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  background-attachment: fixed;
+  
+}
+
+/* ✅ Glass effect container */
+.table-container {
+  width: 95%;
+  max-width: 1100px;
+  border: 1px solid black;
+  border-radius: 16px;
+  padding: 20px;
+  
+}
+
+/* ✅ Table styling */
+.glass-table {
+  width: 100%;
+  border-collapse: collapse;
+  color: black; /* text in black */
+}
+
+.glass-table th, 
+.glass-table td {
+  padding: 12px 15px;
+  text-align: center;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+
+.glass-table tr:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transition: 0.3s;
+}
+
+/* ✅ Title */
+.table-title {
+  text-align: center;
+  font-size: 30px;
+  font-weight: bold;
+  font-family: 'Times New Roman', Times, serif;
+  margin-bottom: 20px;
+  color: black;
+}
+
+/* ✅ Bin button */
+.delete-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: red;
+  transition: transform 0.2s ease-in-out;
+  size: 10px;
+}
+
+.delete-btn:hover {
+  transform: scale(1.2);
+}

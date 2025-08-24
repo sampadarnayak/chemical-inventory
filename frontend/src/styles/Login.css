@@ -1,0 +1,85 @@
+/* Background already handled in Global.css */
+
+.login-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  text-align: center;
+  background: transparent;
+}
+
+.login-title {
+  font-size: 3rem;
+  font-weight: 500;
+  font-family: 'Times New Roman', Times, serif;
+  color: #000; /* Black */
+  margin-bottom: 30px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  animation: fadeInDown 1s ease-in-out;
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.login-box {
+  background: transparent;
+  border: 1px solid black;
+  padding: 30px;
+  border-radius: 12px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+  width: 400px;
+  animation: fadeInUp 1s ease-in-out;
+  color: white;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.login-box input {
+  width: 100%;
+  padding: 12px;
+  margin: 10px 0;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  outline: none;
+  color: #000;
+}
+
+.login-box button {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(90deg, #010b17, #07151a);
+  color: white;
+  font-size: 1.1rem;
+  font-family: 'Times New Roman', Times, serif;
+  font-weight: normal;
+  cursor: pointer;
+  transition: transform 0.2s, background 0.3s;
+}
+
+.login-box button:hover {
+  transform: scale(1.05);
+  background: linear-gradient(90deg, #01060b, #051014);
+}
