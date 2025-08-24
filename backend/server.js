@@ -120,7 +120,7 @@ app.post("/chemicals", async (req, res) => {
 app.delete("/chemicals/:id", async (req, res) => {
   const { id } = req.params;
   try {
-    await pool.query("DELETE FROM chemicals WHERE id = $1", [id]);
+    await pool.query("DELETE FROM chemicals WHERE serial_no = $1", [serial_no]);
     res.json({ success: true, message: "Chemical deleted" });
   } catch (err) {
     res.status(500).send(err);
