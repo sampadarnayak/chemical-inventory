@@ -1,145 +1,220 @@
-require('dotenv').config(); // <-- must be first
-const express = require("express");
-const { Pool } = require("pg");
-const cors = require("cors");
+import dotenv from "dotenv";
+dotenv.config();
+
+import express from "express";
+import cors from "cors";
+import bodyParser from "body-parser";
+import pkg from "pg";
+
+const { Pool } = pkg;
 
 const app = express();
-app.use(cors());
-app.use(express.json());
 
-// ✅ Database connection (Render Postgres)
+// If you know your frontend origins, list them here.
+// For dev, localhost:3000 is enough. You can relax to app.use(cors()) if you prefer.
+app.use(cors({
+  origin: ["http://localhost:3000"],
+  credentials: true,
+}));
+app.use(bodyParser.json());
+
+// ---- PostgreSQL pool (Render external connection via .env) ----
+if (!process.env.DATABASE_URL) {
+  console.warn("⚠️  DATABASE_URL is not set. Create backend/.env with DATABASE_URL=...");
+}
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
+  // Render external Postgres requires SSL
+  ssl: { rejectUnauthorized: false },
 });
 
-// ✅ Login route
-app.post("/login", async (req, res) => {
-  const { username, password } = req.body;
+// Utility
+const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+
+// ---- Health check (optional but handy) ----
+app.get("/health", async (req, res) => {
   try {
-    const result = await pool.query(
-      "SELECT * FROM users WHERE username = $1 AND password = $2",
-      [username, password]
-    );
-    if (result.rows.length > 0) {
-      res.json({ success: true, token: "dummy-token" }); // later replace with JWT
-    } else {
-      res.json({ success: false, message: "Invalid credentials" });
+    const r = await pool.query("SELECT current_database() AS db, current_user AS usr");
+    res.json({ ok: true, db: r.rows[0].db, user: r.rows[0].usr });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// ---- Get ALL chemicals ----
+app.get("/chemicals", async (_req, res) => {
+  try {
+    const query = `
+      SELECT
+        serial_no,
+        name,
+        sku,
+        quantity,
+        total_quantity,
+        consumed,
+        actual_stock,
+        receivedon,
+        enduser,
+        vendorname,
+        ponumber,
+        podate,
+        invoiceno,
+        invoicedate,
+        invoiceamount,
+        paymentstatus,
+        remarks
+      FROM chemicals
+      ORDER BY serial_no ASC
+    `;
+    const result = await pool.query(query);
+
+    // Debug a sample row once:
+    if (result.rows[0]) {
+      console.log("Sample row keys:", Object.keys(result.rows[0]));
     }
+
+    res.json(result.rows);
   } catch (err) {
-    res.status(500).send(err);
+    console.error("GET /chemicals error:", err);
+    res.status(500).json({ error: err.message });
   }
 });
 
-// ✅ Change password route
-app.post("/change-password", async (req, res) => {
-  const { username, newPassword } = req.body;
+// ---- Get ONE chemical by serial_no ----
+app.get("/chemicals/:id", async (req, res) => {
   try {
-    await pool.query(
-      "UPDATE users SET password = $1 WHERE username = $2",
-      [newPassword, username]
+    const { id } = req.params;
+    const result = await pool.query(
+      `SELECT
+         serial_no, name, sku, quantity, total_quantity, consumed, actual_stock,
+         receivedon, enduser, vendorname, ponumber, podate, invoiceno,
+         invoicedate, invoiceamount, paymentstatus, remarks
+       FROM chemicals
+       WHERE serial_no = $1`,
+      [id]
     );
-    res.json({ success: true, message: "Password updated" });
+    if (!result.rows.length) return res.status(404).json({ error: "Not found" });
+    res.json(result.rows[0]);
   } catch (err) {
-    res.status(500).send(err);
+    console.error("GET /chemicals/:id error:", err);
+    res.status(500).json({ error: err.message });
   }
 });
 
-// ✅ Fetch all chemicals
-app.get("/chemicals", async (req, res) => {
-  try {
-    const result = await pool.query("SELECT * FROM chemicals");
-
-    // 🔄 Map DB columns to frontend-friendly keys
-    const formatted = result.rows.map(row => ({
-      sl_no: row.serial_no,
-      name: row.name,                 
-      chemical_name: row.name,   // ✅ FIXED here
-      sku: row.sku,
-      quantity: row.quantity,
-      consumed: row.consumed,
-      total_quantity: row.total_quantity,
-      actual_stock: row.actual_stock
-    }));
-
-    res.json(formatted);
-  } catch (err) {
-    res.status(500).send(err);
-  }
-});
-
-// ✅ Add a chemical (auto-calculate serial_no, total_quantity, actual_stock)
+// ---- Add new chemicals (multiple rows) ----
 app.post("/chemicals", async (req, res) => {
-  const { name, sku, quantity } = req.body;
-
-  // Function to parse sku (e.g., "500g", "1kg", "3 ampules", "500ml")
-  function parseSku(sku) {
-    if (!sku) return null;
-
-    const str = sku.toLowerCase().trim();
-    let value = parseFloat(str);
-
-    if (str.includes("kg")) {
-      return value * 1000; // convert kg → grams
-    } else if (str.includes("g")) {
-      return value; // grams
-    } else if (str.includes("ml")) {
-      return value; // ml
-    } else if (str.includes("ampule") || str.includes("ampules")) {
-      return value; // count of ampules
-    } else {
-      return isNaN(value) ? null : value; // fallback numeric
-    }
-  }
-
-  const parsedSku = parseSku(sku);
-  const total_quantity = parsedSku !== null ? parsedSku * quantity : null;
-  const consumed = 0;
-  const actual_stock = total_quantity !== null ? total_quantity - consumed : null;
-
   try {
-    // generate serial_no dynamically
-    const countResult = await pool.query("SELECT COUNT(*) FROM chemicals");
-    const serial_no = parseInt(countResult.rows[0].count) + 1;
+    const { chemicals } = req.body;
+    if (!Array.isArray(chemicals) || chemicals.length === 0) {
+      return res.status(400).json({ error: "chemicals array required" });
+    }
 
-    const insertResult = await pool.query(
-      `INSERT INTO chemicals 
-       (serial_no, name, sku, quantity, total_quantity, consumed, actual_stock) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
-      [serial_no, name, sku, quantity, total_quantity, consumed, actual_stock]
-    );
+    const insertPromises = chemicals.map((ch) => {
+      const sku = num(ch.sku);
+      const quantity = num(ch.quantity);
+      const consumed = num(ch.consumed);
+      const total_quantity = sku * quantity;
+      const actual_stock = Math.max(0, total_quantity - consumed);
 
-    res.json({ success: true, id: insertResult.rows[0].id });
+      return pool.query(
+        `INSERT INTO chemicals 
+          (serial_no, name, sku, quantity, total_quantity, consumed, actual_stock,
+           receivedon, enduser, vendorname, ponumber, podate, invoiceno, invoicedate,
+           invoiceamount, paymentstatus, remarks)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
+        [
+          ch.serial_no,
+          ch.name,
+          sku,
+          quantity,
+          total_quantity,
+          consumed,
+          actual_stock,
+          ch.receivedon || null,
+          ch.enduser || null,
+          ch.vendorname || null,
+          ch.ponumber || null,
+          ch.podate || null,
+          ch.invoiceno || null,
+          ch.invoicedate || null,
+          ch.invoiceamount ?? null,
+          ch.paymentstatus || null,
+          ch.remarks || null,
+        ]
+      );
+    });
+
+    await Promise.all(insertPromises);
+    res.json({ message: "Chemicals added successfully" });
   } catch (err) {
-    console.error("❌ Error inserting chemical:", err);
-    res.status(500).send(err);
+    console.error("POST /chemicals error:", err);
+    res.status(500).json({ error: err.message });
   }
 });
 
-// ✅ Delete a chemical
-// Delete a chemical by serial_no
-app.delete("/chemicals/:serial_no", async (req, res) => {
-  const { serial_no } = req.params; // get serial_no from URL
-
+// ---- Update chemical by serial_no ----
+app.put("/chemicals/:id", async (req, res) => {
   try {
-    const result = await pool.query(
-      "DELETE FROM chemicals WHERE serial_no = $1",
-      [serial_no]
+    const { id } = req.params;
+    const ch = req.body;
+
+    const sku = num(ch.sku);
+    const quantity = num(ch.quantity);
+    const consumed = num(ch.consumed);
+    const total_quantity = sku * quantity;
+    const actual_stock = Math.max(0, total_quantity - consumed);
+
+    await pool.query(
+      `UPDATE chemicals SET 
+         name=$1, sku=$2, quantity=$3, total_quantity=$4, consumed=$5, actual_stock=$6, 
+         receivedon=$7, enduser=$8, vendorname=$9, ponumber=$10, podate=$11, 
+         invoiceno=$12, invoicedate=$13, invoiceamount=$14, paymentstatus=$15, remarks=$16
+       WHERE serial_no=$17`,
+      [
+        ch.name,
+        sku,
+        quantity,
+        total_quantity,
+        consumed,
+        actual_stock,
+        ch.receivedon || null,
+        ch.enduser || null,
+        ch.vendorname || null,
+        ch.ponumber || null,
+        ch.podate || null,
+        ch.invoiceno || null,
+        ch.invoicedate || null,
+        ch.invoiceamount ?? null,
+        ch.paymentstatus || null,
+        ch.remarks || null,
+        id,
+      ]
     );
-
-    if (result.rowCount === 0) {
-      return res.status(404).json({ success: false, message: "Chemical not found" });
-    }
-
-    res.json({ success: true, message: "Chemical deleted successfully" });
+    res.json({ message: "Chemical updated successfully" });
   } catch (err) {
-    console.error("Error deleting chemical:", err);
-    res.status(500).json({ success: false, error: err.message });
+    console.error("PUT /chemicals/:id error:", err);
+    res.status(500).json({ error: err.message });
   }
 });
 
+// ---- Delete chemical ----
+app.delete("/chemicals/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    await pool.query("DELETE FROM chemicals WHERE serial_no = $1", [id]);
+    res.json({ message: "Chemical deleted successfully" });
+  } catch (err) {
+    console.error("DELETE /chemicals/:id error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
-
-// ✅ Start server (Render uses PORT env var)
+// ---- Start server ----
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+app.listen(PORT, () => {
+  const host = (() => {
+    try { return new URL(process.env.DATABASE_URL).host; } catch { return "(no DATABASE_URL)"; }
+  })();
+  console.log(`Server running on port ${PORT}`);
+  console.log(`DB host: ${host}`);
+});
