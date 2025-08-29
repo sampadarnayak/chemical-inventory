@@ -8,7 +8,6 @@ import "./styles/Form.css";
  * FormPage
  *
  * Handles adding new chemicals or editing existing PO with chemicals.
- * - SL (serial_no) is read-only and auto-fills to the next number from DB.
  */
 
 function safeNum(v) {
@@ -56,9 +55,6 @@ function FormPage() {
     },
   ]);
 
-  // next serial preview
-  const [nextSerial, setNextSerial] = useState(1);
-
   const [initialSerials, setInitialSerials] = useState([]);
   const [isPoEditMode, setIsPoEditMode] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -68,42 +64,58 @@ function FormPage() {
     return resp.data || [];
   };
 
-  // Fetch next serial from DB for new inserts
-  useEffect(() => {
-    async function fetchMaxSerialForAddMode() {
-      try {
-        const all = await fetchAllChemicals();
-        const maxSerial =
-          all.reduce(
-            (m, r) => (Number(r.serial_no) > m ? Number(r.serial_no) : m),
-            0
-          ) || 0;
-        const ns = maxSerial + 1;
-        setNextSerial(ns);
+  // ---- derive an empty row with a given serial and current PO fields
+  const makeEmptyRow = (serial, po) => ({
+    serial_no: serial,
+    name: "",
+    sku: "",
+    quantity: "",
+    total_quantity: 0,
+    consumed: 0,
+    actual_stock: 0,
+    receivedon: po.receivedon || "",
+    enduser: po.enduser || "",
+    vendorname: po.vendorname || "",
+    ponumber: po.ponumber || "",
+    podate: po.podate || "",
+    invoiceno: po.invoiceno || "",
+    invoicedate: po.invoicedate || "",
+    invoiceamount: po.invoiceamount || "",
+    invoice_submitted_on: po.invoice_submitted_on || "",
+    remarks: po.remarks || "",
+  });
 
-        // If we're not editing a PO (pure add mode), prefill the first row's SL
-        if (!chemicalToEdit) {
+  // ---- Initialize when editing OR starting a new PO
+  useEffect(() => {
+    async function init() {
+      if (!chemicalToEdit) {
+        // ADD MODE: set the first row's serial to max(serial_no)+1 from DB
+        try {
+          const all = await fetchAllChemicals();
+          const maxSerial =
+            all.reduce((m, c) => Math.max(m, Number(c.serial_no) || 0), 0) || 0;
+          const start = maxSerial + 1;
           setRows((prev) => {
+            // only set if empty (avoid clobber on re-renders)
+            if (!prev[0] || prev[0].serial_no) return prev;
             const copy = [...prev];
-            if (!copy[0].serial_no) copy[0].serial_no = ns;
+            copy[0] = { ...copy[0], serial_no: start };
+            return copy;
+          });
+        } catch (e) {
+          console.error("Failed to initialize serial:", e);
+          // fallback to 1 if DB read fails
+          setRows((prev) => {
+            if (!prev[0] || prev[0].serial_no) return prev;
+            const copy = [...prev];
+            copy[0] = { ...copy[0], serial_no: 1 };
             return copy;
           });
         }
-      } catch (err) {
-        console.error("Error fetching max serial:", err);
-        setNextSerial(1);
+        return;
       }
-    }
 
-    fetchMaxSerialForAddMode();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chemicalToEdit]);
-
-  // Load edit data (if any)
-  useEffect(() => {
-    async function initEdit() {
-      if (!chemicalToEdit) return;
-
+      // EDIT MODE:
       const po = chemicalToEdit.ponumber;
       if (po) {
         setLoading(true);
@@ -180,17 +192,13 @@ function FormPage() {
         vendorname: c.vendorname || prev.vendorname,
         enduser: c.enduser || prev.enduser,
         invoiceno: c.invoiceno || prev.invoiceno,
-        invoicedate: c.invoicedate
-          ? new Date(c.invoicedate).toISOString().split("T")[0]
-          : prev.invoicedate,
+        invoicedate: c.invoicedate ? new Date(c.invoicedate).toISOString().split("T")[0] : prev.invoicedate,
         invoiceamount: c.invoiceamount || prev.invoiceamount,
         invoice_submitted_on: c.invoice_submitted_on
           ? new Date(c.invoice_submitted_on).toISOString().split("T")[0]
           : prev.invoice_submitted_on,
         remarks: c.remarks || prev.remarks,
-        receivedon: c.receivedon
-          ? new Date(c.receivedon).toISOString().split("T")[0]
-          : prev.receivedon,
+        receivedon: c.receivedon ? new Date(c.receivedon).toISOString().split("T")[0] : prev.receivedon,
       }));
 
       const mapped = {
@@ -198,23 +206,17 @@ function FormPage() {
         name: c.name ?? "",
         sku: c.sku ?? "",
         quantity: c.quantity ?? "",
-        total_quantity:
-          c.total_quantity ?? safeNum(c.sku) * safeNum(c.quantity),
+        total_quantity: c.total_quantity ?? safeNum(c.sku) * safeNum(c.quantity),
         consumed: c.consumed ?? 0,
         actual_stock:
-          c.actual_stock ??
-          safeNum(c.sku) * safeNum(c.quantity) - safeNum(c.consumed),
-        receivedon: c.receivedon
-          ? new Date(c.receivedon).toISOString().split("T")[0]
-          : "",
+          c.actual_stock ?? safeNum(c.sku) * safeNum(c.quantity) - safeNum(c.consumed),
+        receivedon: c.receivedon ? new Date(c.receivedon).toISOString().split("T")[0] : "",
         enduser: c.enduser ?? "",
         vendorname: c.vendorname ?? "",
         ponumber: c.ponumber ?? "",
         podate: c.podate ? new Date(c.podate).toISOString().split("T")[0] : "",
         invoiceno: c.invoiceno ?? "",
-        invoicedate: c.invoicedate
-          ? new Date(c.invoicedate).toISOString().split("T")[0]
-          : "",
+        invoicedate: c.invoicedate ? new Date(c.invoicedate).toISOString().split("T")[0] : "",
         invoiceamount: c.invoiceamount ?? "",
         invoice_submitted_on: c.invoice_submitted_on
           ? new Date(c.invoice_submitted_on).toISOString().split("T")[0]
@@ -226,36 +228,20 @@ function FormPage() {
       setIsPoEditMode(Boolean(mapped.ponumber));
     }
 
-    initEdit();
+    init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chemicalToEdit]);
 
+  // ---- Add a new row with the next serial (derived from current rows)
   const addRow = () => {
-    // For add mode: use and increment nextSerial
-    setRows((r) =>
-      r.concat([
-        {
-          serial_no: nextSerial, // show next number
-          name: "",
-          sku: "",
-          quantity: "",
-          total_quantity: 0,
-          consumed: 0,
-          actual_stock: 0,
-          receivedon: poFields.receivedon || "",
-          enduser: poFields.enduser || "",
-          vendorname: poFields.vendorname || "",
-          ponumber: poFields.ponumber || "",
-          podate: poFields.podate || "",
-          invoiceno: poFields.invoiceno || "",
-          invoicedate: poFields.invoicedate || "",
-          invoiceamount: poFields.invoiceamount || "",
-          invoice_submitted_on: poFields.invoice_submitted_on || "",
-          remarks: poFields.remarks || "",
-        },
-      ])
-    );
-    setNextSerial((n) => n + 1);
+    setRows((prev) => {
+      const maxInRows = prev.reduce(
+        (m, r) => Math.max(m, Number(r.serial_no) || 0),
+        0
+      );
+      const nextSerial = (maxInRows || 0) + 1;
+      return [...prev, makeEmptyRow(nextSerial, poFields)];
+    });
   };
 
   const removeRow = (idx) => {
@@ -263,6 +249,9 @@ function FormPage() {
   };
 
   const updateRowField = (idx, field, value) => {
+    // SL is read-only; we won't update it here even if called
+    if (field === "serial_no") return;
+
     setRows((prev) => {
       const copy = JSON.parse(JSON.stringify(prev));
       copy[idx][field] = value;
@@ -321,7 +310,7 @@ function FormPage() {
         const quantity = safeNum(r.quantity);
         const consumed = safeNum(r.consumed);
         return {
-          serial_no: r.serial_no, // backend ignores this on insert (DB auto-generates), but keeps it for PUT
+          serial_no: r.serial_no,
           name: r.name,
           sku,
           quantity,
@@ -399,6 +388,8 @@ function FormPage() {
             className="p-2 border rounded"
             required
           />
+
+          {/* PO Date with inline date picker (text → date on focus) */}
           <div className="col-span-1">
             <input
               type="text"
@@ -410,6 +401,7 @@ function FormPage() {
               className="p-2 border rounded w-full"
             />
           </div>
+
           <input
             name="vendorname"
             placeholder="Vendor Name"
@@ -431,6 +423,8 @@ function FormPage() {
             onChange={(e) => handlePoFieldChange("invoiceno", e.target.value)}
             className="p-2 border rounded"
           />
+
+          {/* Invoice Date */}
           <div className="col-span-1">
             <input
               type="text"
@@ -442,6 +436,7 @@ function FormPage() {
               className="p-2 border rounded w-full"
             />
           </div>
+
           <input
             name="invoiceamount"
             placeholder="Invoice Amount"
@@ -449,6 +444,8 @@ function FormPage() {
             onChange={(e) => handlePoFieldChange("invoiceamount", e.target.value)}
             className="p-2 border rounded"
           />
+
+          {/* Invoice Submitted On */}
           <div className="col-span-1">
             <input
               type="text"
@@ -498,6 +495,7 @@ function FormPage() {
                 placeholder="SL"
                 className="p-1 border rounded w-full"
                 readOnly
+                required
               />
             </div>
 
