@@ -8,6 +8,7 @@ import "./styles/Form.css";
  * FormPage
  *
  * Handles adding new chemicals or editing existing PO with chemicals.
+ * - SL (serial_no) is read-only and auto-fills to the next number from DB.
  */
 
 function safeNum(v) {
@@ -55,6 +56,9 @@ function FormPage() {
     },
   ]);
 
+  // next serial preview
+  const [nextSerial, setNextSerial] = useState(1);
+
   const [initialSerials, setInitialSerials] = useState([]);
   const [isPoEditMode, setIsPoEditMode] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -64,6 +68,38 @@ function FormPage() {
     return resp.data || [];
   };
 
+  // Fetch next serial from DB for new inserts
+  useEffect(() => {
+    async function fetchMaxSerialForAddMode() {
+      try {
+        const all = await fetchAllChemicals();
+        const maxSerial =
+          all.reduce(
+            (m, r) => (Number(r.serial_no) > m ? Number(r.serial_no) : m),
+            0
+          ) || 0;
+        const ns = maxSerial + 1;
+        setNextSerial(ns);
+
+        // If we're not editing a PO (pure add mode), prefill the first row's SL
+        if (!chemicalToEdit) {
+          setRows((prev) => {
+            const copy = [...prev];
+            if (!copy[0].serial_no) copy[0].serial_no = ns;
+            return copy;
+          });
+        }
+      } catch (err) {
+        console.error("Error fetching max serial:", err);
+        setNextSerial(1);
+      }
+    }
+
+    fetchMaxSerialForAddMode();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chemicalToEdit]);
+
+  // Load edit data (if any)
   useEffect(() => {
     async function initEdit() {
       if (!chemicalToEdit) return;
@@ -93,18 +129,14 @@ function FormPage() {
               enduser: c.enduser ?? "",
               vendorname: c.vendorname ?? "",
               ponumber: c.ponumber ?? "",
-              podate: c.podate
-                ? new Date(c.podate).toISOString().split("T")[0]
-                : "",
+              podate: c.podate ? new Date(c.podate).toISOString().split("T")[0] : "",
               invoiceno: c.invoiceno ?? "",
               invoicedate: c.invoicedate
                 ? new Date(c.invoicedate).toISOString().split("T")[0]
                 : "",
               invoiceamount: c.invoiceamount ?? "",
               invoice_submitted_on: c.invoice_submitted_on
-                ? new Date(c.invoice_submitted_on)
-                    .toISOString()
-                    .split("T")[0]
+                ? new Date(c.invoice_submitted_on).toISOString().split("T")[0]
                 : "",
               remarks: c.remarks ?? "",
             }));
@@ -144,9 +176,7 @@ function FormPage() {
       setPoFields((prev) => ({
         ...prev,
         ponumber: c.ponumber || prev.ponumber,
-        podate: c.podate
-          ? new Date(c.podate).toISOString().split("T")[0]
-          : prev.podate,
+        podate: c.podate ? new Date(c.podate).toISOString().split("T")[0] : prev.podate,
         vendorname: c.vendorname || prev.vendorname,
         enduser: c.enduser || prev.enduser,
         invoiceno: c.invoiceno || prev.invoiceno,
@@ -180,9 +210,7 @@ function FormPage() {
         enduser: c.enduser ?? "",
         vendorname: c.vendorname ?? "",
         ponumber: c.ponumber ?? "",
-        podate: c.podate
-          ? new Date(c.podate).toISOString().split("T")[0]
-          : "",
+        podate: c.podate ? new Date(c.podate).toISOString().split("T")[0] : "",
         invoiceno: c.invoiceno ?? "",
         invoicedate: c.invoicedate
           ? new Date(c.invoicedate).toISOString().split("T")[0]
@@ -203,10 +231,11 @@ function FormPage() {
   }, [chemicalToEdit]);
 
   const addRow = () => {
+    // For add mode: use and increment nextSerial
     setRows((r) =>
       r.concat([
         {
-          serial_no: "",
+          serial_no: nextSerial, // show next number
           name: "",
           sku: "",
           quantity: "",
@@ -226,6 +255,7 @@ function FormPage() {
         },
       ])
     );
+    setNextSerial((n) => n + 1);
   };
 
   const removeRow = (idx) => {
@@ -291,7 +321,7 @@ function FormPage() {
         const quantity = safeNum(r.quantity);
         const consumed = safeNum(r.consumed);
         return {
-          serial_no: r.serial_no,
+          serial_no: r.serial_no, // backend ignores this on insert (DB auto-generates), but keeps it for PUT
           name: r.name,
           sku,
           quantity,
@@ -370,16 +400,16 @@ function FormPage() {
             required
           />
           <div className="col-span-1">
-  <input
-    type="text"
-    placeholder="PO Date"
-    value={poFields.podate}
-    onChange={(e) => handlePoFieldChange("podate", e.target.value)}
-    onFocus={(e) => (e.target.type = "date")}
-    onBlur={(e) => (e.target.type = "text")}
-    className="p-2 border rounded w-full"
-  />
-</div>
+            <input
+              type="text"
+              placeholder="PO Date"
+              value={poFields.podate}
+              onChange={(e) => handlePoFieldChange("podate", e.target.value)}
+              onFocus={(e) => (e.target.type = "date")}
+              onBlur={(e) => (e.target.type = "text")}
+              className="p-2 border rounded w-full"
+            />
+          </div>
           <input
             name="vendorname"
             placeholder="Vendor Name"
@@ -402,16 +432,16 @@ function FormPage() {
             className="p-2 border rounded"
           />
           <div className="col-span-1">
-  <input
-    type="text"
-    placeholder="Invoice Date"
-    value={poFields.invoicedate}
-    onChange={(e) => handlePoFieldChange("invoicedate", e.target.value)}
-    onFocus={(e) => (e.target.type = "date")}
-    onBlur={(e) => (e.target.type = "text")}
-    className="p-2 border rounded w-full"
-  />
-</div>
+            <input
+              type="text"
+              placeholder="Invoice Date"
+              value={poFields.invoicedate}
+              onChange={(e) => handlePoFieldChange("invoicedate", e.target.value)}
+              onFocus={(e) => (e.target.type = "date")}
+              onBlur={(e) => (e.target.type = "text")}
+              className="p-2 border rounded w-full"
+            />
+          </div>
           <input
             name="invoiceamount"
             placeholder="Invoice Amount"
@@ -420,17 +450,19 @@ function FormPage() {
             className="p-2 border rounded"
           />
           <div className="col-span-1">
-  <input
-    type="text"
-    placeholder="Invoice Submitted On"
-    value={poFields.invoice_submitted_on}
-    onChange={(e) => handlePoFieldChange("invoice_submitted_on", e.target.value)}
-    onFocus={(e) => (e.target.type = "date")}
-    onBlur={(e) => (e.target.type = "text")}
-    className="p-2 border rounded w-full"
-  />
-</div>
-          
+            <input
+              type="text"
+              placeholder="Invoice Submitted On"
+              value={poFields.invoice_submitted_on}
+              onChange={(e) =>
+                handlePoFieldChange("invoice_submitted_on", e.target.value)
+              }
+              onFocus={(e) => (e.target.type = "date")}
+              onBlur={(e) => (e.target.type = "text")}
+              className="p-2 border rounded w-full"
+            />
+          </div>
+
           <input
             name="remarks"
             placeholder="Remarks"
@@ -463,10 +495,9 @@ function FormPage() {
               <input
                 name={`serial_no_${idx}`}
                 value={r.serial_no}
-                onChange={(e) => updateRowField(idx, "serial_no", e.target.value)}
                 placeholder="SL"
                 className="p-1 border rounded w-full"
-                required
+                readOnly
               />
             </div>
 
@@ -564,10 +595,10 @@ function FormPage() {
             className="px-3 py-2 bg-green-200 rounded hover:bg-green-300"
             title="Add another chemical under same PO"
           >
-             Add chemical
+            Add chemical
           </button>
 
-        <button
+          <button
             type="submit"
             className="px-4 py-2 bg-gray-300 text-white rounded hover:bg-gray-400"
             disabled={loading}
