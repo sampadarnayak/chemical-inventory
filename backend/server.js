@@ -62,12 +62,7 @@ app.get("/health", async (_req, res) => {
   }
 });
 
-/* ---------------- GET: All chemicals ----------------
-   Columns (NOTE: no paymentstatus; includes invoice_submitted_on):
-   serial_no, name, sku, quantity, total_quantity, consumed, actual_stock,
-   receivedon, enduser, vendorname, ponumber, podate, invoiceno, invoicedate,
-   invoiceamount, invoice_submitted_on, remarks
------------------------------------------------------ */
+/* ---------------- GET: All chemicals ---------------- */
 app.get("/chemicals", async (_req, res) => {
   try {
     const query = `
@@ -141,8 +136,7 @@ app.get("/chemicals/:id", async (req, res) => {
      total_quantity = sku * quantity
      actual_stock   = max(0, total_quantity - consumed)
    Behavior:
-     - If serial_no is provided, it’s used.
-     - If serial_no is missing/empty, DB auto-assigns via DEFAULT.
+     - DB always assigns serial_no automatically (no manual serials).
 -------------------------------------------------------------- */
 app.post("/chemicals", async (req, res) => {
   try {
@@ -158,7 +152,17 @@ app.post("/chemicals", async (req, res) => {
       const total_quantity = sku * quantity;
       const actual_stock = Math.max(0, total_quantity - consumed);
 
-      const paramsCommon = [
+      const sql = `
+        INSERT INTO chemicals
+          (name, sku, quantity, total_quantity, consumed, actual_stock,
+           receivedon, enduser, vendorname, ponumber, podate, invoiceno, invoicedate,
+           invoiceamount, invoice_submitted_on, remarks)
+        VALUES
+          ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+        RETURNING serial_no
+      `;
+
+      return pool.query(sql, [
         ch.name ?? null,
         sku,
         quantity,
@@ -175,43 +179,11 @@ app.post("/chemicals", async (req, res) => {
         ch.invoiceamount ?? null,
         ch.invoice_submitted_on || null,
         ch.remarks || null,
-      ];
-
-      // If serial_no is provided → include it in the insert
-      if (ch.serial_no != null && ch.serial_no !== "") {
-        const sql = `
-          INSERT INTO chemicals
-            (serial_no, name, sku, quantity, total_quantity, consumed, actual_stock,
-             receivedon, enduser, vendorname, ponumber, podate, invoiceno, invoicedate,
-             invoiceamount, invoice_submitted_on, remarks)
-          VALUES
-            ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
-          RETURNING serial_no
-        `;
-        const params = [
-          ch.serial_no,
-          ...paramsCommon,
-        ];
-        return pool.query(sql, params);
-      }
-
-      // No serial_no given → let DB auto-assign
-      const sql = `
-        INSERT INTO chemicals
-          (name, sku, quantity, total_quantity, consumed, actual_stock,
-           receivedon, enduser, vendorname, ponumber, podate, invoiceno, invoicedate,
-           invoiceamount, invoice_submitted_on, remarks)
-        VALUES
-          ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
-        RETURNING serial_no
-      `;
-      return pool.query(sql, paramsCommon);
+      ]);
     });
 
     const results = await Promise.all(tasks);
-    const insertedSerials = results
-      .map(r => r?.rows?.[0]?.serial_no)
-      .filter((v) => v !== undefined && v !== null);
+    const insertedSerials = results.map((r) => r.rows[0].serial_no);
 
     res.json({ message: "Chemicals added successfully", serials: insertedSerials });
   } catch (err) {

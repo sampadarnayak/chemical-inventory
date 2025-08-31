@@ -59,12 +59,12 @@ function FormPage() {
   const [isPoEditMode, setIsPoEditMode] = useState(false);
   const [loading, setLoading] = useState(false);
 
+
   const fetchAllChemicals = async () => {
     const resp = await axios.get(`${API_BASE_URL}/chemicals`);
     return resp.data || [];
   };
 
-  // ---- derive an empty row with a given serial and current PO fields
   const makeEmptyRow = (serial, po) => ({
     serial_no: serial,
     name: "",
@@ -85,37 +85,33 @@ function FormPage() {
     remarks: po.remarks || "",
   });
 
-  // ---- Initialize when editing OR starting a new PO
   useEffect(() => {
     async function init() {
       if (!chemicalToEdit) {
-        // ADD MODE: set the first row's serial to max(serial_no)+1 from DB
-        try {
-          const all = await fetchAllChemicals();
-          const maxSerial =
-            all.reduce((m, c) => Math.max(m, Number(c.serial_no) || 0), 0) || 0;
-          const start = maxSerial + 1;
-          setRows((prev) => {
-            // only set if empty (avoid clobber on re-renders)
-            if (!prev[0] || prev[0].serial_no) return prev;
-            const copy = [...prev];
-            copy[0] = { ...copy[0], serial_no: start };
-            return copy;
-          });
-        } catch (e) {
-          console.error("Failed to initialize serial:", e);
-          // fallback to 1 if DB read fails
-          setRows((prev) => {
-            if (!prev[0] || prev[0].serial_no) return prev;
-            const copy = [...prev];
-            copy[0] = { ...copy[0], serial_no: 1 };
-            return copy;
-          });
-        }
-        return;
-      }
+  // ADD MODE: base on DB row count
+try {
+  const all = await fetchAllChemicals();
+  const count = all.length;   // count of existing rows
+  const start = count + 1;    // next serial = count + 1
 
-      // EDIT MODE:
+  setRows((prev) => {
+    if (!prev[0] || prev[0].serial_no) return prev;
+    const copy = [...prev];
+    copy[0] = { ...copy[0], serial_no: start };
+    return copy;
+  });
+} catch (e) {
+  console.error("Failed to initialize serial:", e);
+  setRows((prev) => {
+    if (!prev[0] || prev[0].serial_no) return prev;
+    const copy = [...prev];
+    copy[0] = { ...copy[0], serial_no: 1 };
+    return copy;
+  });
+}
+  return;
+}
+
       const po = chemicalToEdit.ponumber;
       if (po) {
         setLoading(true);
@@ -141,7 +137,9 @@ function FormPage() {
               enduser: c.enduser ?? "",
               vendorname: c.vendorname ?? "",
               ponumber: c.ponumber ?? "",
-              podate: c.podate ? new Date(c.podate).toISOString().split("T")[0] : "",
+              podate: c.podate
+                ? new Date(c.podate).toISOString().split("T")[0]
+                : "",
               invoiceno: c.invoiceno ?? "",
               invoicedate: c.invoicedate
                 ? new Date(c.invoicedate).toISOString().split("T")[0]
@@ -188,17 +186,23 @@ function FormPage() {
       setPoFields((prev) => ({
         ...prev,
         ponumber: c.ponumber || prev.ponumber,
-        podate: c.podate ? new Date(c.podate).toISOString().split("T")[0] : prev.podate,
+        podate: c.podate
+          ? new Date(c.podate).toISOString().split("T")[0]
+          : prev.podate,
         vendorname: c.vendorname || prev.vendorname,
         enduser: c.enduser || prev.enduser,
         invoiceno: c.invoiceno || prev.invoiceno,
-        invoicedate: c.invoicedate ? new Date(c.invoicedate).toISOString().split("T")[0] : prev.invoicedate,
+        invoicedate: c.invoicedate
+          ? new Date(c.invoicedate).toISOString().split("T")[0]
+          : prev.invoicedate,
         invoiceamount: c.invoiceamount || prev.invoiceamount,
         invoice_submitted_on: c.invoice_submitted_on
           ? new Date(c.invoice_submitted_on).toISOString().split("T")[0]
           : prev.invoice_submitted_on,
         remarks: c.remarks || prev.remarks,
-        receivedon: c.receivedon ? new Date(c.receivedon).toISOString().split("T")[0] : prev.receivedon,
+        receivedon: c.receivedon
+          ? new Date(c.receivedon).toISOString().split("T")[0]
+          : prev.receivedon,
       }));
 
       const mapped = {
@@ -209,14 +213,21 @@ function FormPage() {
         total_quantity: c.total_quantity ?? safeNum(c.sku) * safeNum(c.quantity),
         consumed: c.consumed ?? 0,
         actual_stock:
-          c.actual_stock ?? safeNum(c.sku) * safeNum(c.quantity) - safeNum(c.consumed),
-        receivedon: c.receivedon ? new Date(c.receivedon).toISOString().split("T")[0] : "",
+          c.actual_stock ??
+          safeNum(c.sku) * safeNum(c.quantity) - safeNum(c.consumed),
+        receivedon: c.receivedon
+          ? new Date(c.receivedon).toISOString().split("T")[0]
+          : "",
         enduser: c.enduser ?? "",
         vendorname: c.vendorname ?? "",
         ponumber: c.ponumber ?? "",
-        podate: c.podate ? new Date(c.podate).toISOString().split("T")[0] : "",
+        podate: c.podate
+          ? new Date(c.podate).toISOString().split("T")[0]
+          : "",
         invoiceno: c.invoiceno ?? "",
-        invoicedate: c.invoicedate ? new Date(c.invoicedate).toISOString().split("T")[0] : "",
+        invoicedate: c.invoicedate
+          ? new Date(c.invoicedate).toISOString().split("T")[0]
+          : "",
         invoiceamount: c.invoiceamount ?? "",
         invoice_submitted_on: c.invoice_submitted_on
           ? new Date(c.invoice_submitted_on).toISOString().split("T")[0]
@@ -232,24 +243,23 @@ function FormPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chemicalToEdit]);
 
-  // ---- Add a new row with the next serial (derived from current rows)
   const addRow = () => {
-    setRows((prev) => {
-      const maxInRows = prev.reduce(
-        (m, r) => Math.max(m, Number(r.serial_no) || 0),
-        0
-      );
-      const nextSerial = (maxInRows || 0) + 1;
-      return [...prev, makeEmptyRow(nextSerial, poFields)];
-    });
-  };
+  setRows((prev) => {
+    // Look at the largest serial_no currently in the rows
+    const maxSerialInRows = prev.reduce(
+      (m, r) => Math.max(m, Number(r.serial_no) || 0),
+      0
+    );
+    const nextSerial = maxSerialInRows + 1;
+    return [...prev, makeEmptyRow(nextSerial, poFields)];
+  });
+};
 
   const removeRow = (idx) => {
     setRows((r) => r.filter((_, i) => i !== idx));
   };
 
   const updateRowField = (idx, field, value) => {
-    // SL is read-only; we won't update it here even if called
     if (field === "serial_no") return;
 
     setRows((prev) => {
@@ -263,7 +273,6 @@ function FormPage() {
       copy[idx].total_quantity = sku * quantity;
       copy[idx].actual_stock = Math.max(0, sku * quantity - consumed);
 
-      // sync PO-level fields into each row
       copy[idx].ponumber = poFields.ponumber;
       copy[idx].podate = poFields.podate;
       copy[idx].vendorname = poFields.vendorname;
@@ -302,75 +311,62 @@ function FormPage() {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+  e.preventDefault();
 
-    try {
-      const payloadRows = rows.map((r) => {
-        const sku = safeNum(r.sku);
-        const quantity = safeNum(r.quantity);
-        const consumed = safeNum(r.consumed);
-        return {
-          serial_no: r.serial_no,
-          name: r.name,
-          sku,
-          quantity,
-          total_quantity: sku * quantity,
-          consumed,
-          actual_stock: Math.max(0, sku * quantity - consumed),
-          receivedon: r.receivedon || poFields.receivedon || null,
-          enduser: r.enduser || poFields.enduser || null,
-          vendorname: r.vendorname || poFields.vendorname || null,
-          ponumber: r.ponumber || poFields.ponumber || null,
-          podate: r.podate || poFields.podate || null,
-          invoiceno: r.invoiceno || poFields.invoiceno || null,
-          invoicedate: r.invoicedate || poFields.invoicedate || null,
-          invoiceamount: r.invoiceamount || poFields.invoiceamount || null,
-          invoice_submitted_on:
-            r.invoice_submitted_on || poFields.invoice_submitted_on || null,
-          remarks: r.remarks || poFields.remarks || null,
-        };
-      });
+  try {
+    const payloadRows = rows.map((r) => {
+      const sku = safeNum(r.sku);
+      const quantity = safeNum(r.quantity);
+      const consumed = safeNum(r.consumed);
+      return {
+        serial_no: r.serial_no,
+        name: r.name,
+        sku,
+        quantity,
+        total_quantity: sku * quantity,
+        consumed,
+        actual_stock: Math.max(0, sku * quantity - consumed),
+        receivedon: r.receivedon || poFields.receivedon || null,
+        enduser: r.enduser || poFields.enduser || null,
+        vendorname: r.vendorname || poFields.vendorname || null,
+        ponumber: r.ponumber || poFields.ponumber || null,
+        podate: r.podate || poFields.podate || null,
+        invoiceno: r.invoiceno || poFields.invoiceno || null,
+        invoicedate: r.invoicedate || poFields.invoicedate || null,
+        invoiceamount: r.invoiceamount || poFields.invoiceamount || null,
+        invoice_submitted_on:
+          r.invoice_submitted_on || poFields.invoice_submitted_on || null,
+        remarks: r.remarks || poFields.remarks || null,
+      };
+    });
 
-      if (!isPoEditMode) {
-        await axios.post(`${API_BASE_URL}/chemicals`, { chemicals: payloadRows });
-        alert("Chemicals saved");
-        navigate("/list");
-        return;
-      }
-
-      const currentSerials = payloadRows
-        .map((r) => (r.serial_no ? r.serial_no.toString() : null))
-        .filter(Boolean);
-      const toDelete = initialSerials.filter(
-        (s) => !currentSerials.includes(String(s))
-      );
-
-      await Promise.allSettled(
-        toDelete.map((s) => axios.delete(`${API_BASE_URL}/chemicals/${s}`))
-      );
-
-      const updatePromises = payloadRows
-        .filter((r) => r.serial_no && initialSerials.includes(Number(r.serial_no)))
-        .map((r) => axios.put(`${API_BASE_URL}/chemicals/${r.serial_no}`, r));
-
-      const newRows = payloadRows.filter(
-        (r) => !r.serial_no || !initialSerials.includes(Number(r.serial_no))
-      );
-
-      await Promise.allSettled(updatePromises);
-
-      if (newRows.length > 0) {
-        await axios.post(`${API_BASE_URL}/chemicals`, { chemicals: newRows });
-      }
-
-      alert("PO update completed");
+    if (!isPoEditMode) {
+      // ADD MODE → only POST
+      await axios.post(`${API_BASE_URL}/chemicals`, { chemicals: payloadRows });
+      alert("Chemicals saved");
       navigate("/list");
-    } catch (err) {
-      console.error("Error saving chemicals:", err);
-      alert("Error saving chemicals. Check console.");
+      return;
     }
-  };
 
+    // EDIT MODE
+    const updatePromises = payloadRows
+      .filter((r) => r.serial_no) // has serial → update
+      .map((r) => axios.put(`${API_BASE_URL}/chemicals/${r.serial_no}`, r));
+
+    const newRows = payloadRows.filter((r) => !r.serial_no); // no serial → new chemical
+    if (newRows.length > 0) {
+      await axios.post(`${API_BASE_URL}/chemicals`, { chemicals: newRows });
+    }
+
+    await Promise.allSettled(updatePromises);
+
+    alert("PO update completed");
+    navigate("/list");
+  } catch (err) {
+    console.error("Error saving chemicals:", err);
+    alert("Error saving chemicals. Check console.");
+  }
+};
   return (
     <div className="form-container p-6 mx-auto bg-white/80 backdrop-blur rounded-lg shadow-md">
       <h2 className="text-2xl font-semibold mb-4">
@@ -389,7 +385,6 @@ function FormPage() {
             required
           />
 
-          {/* PO Date with inline date picker (text → date on focus) */}
           <div className="col-span-1">
             <input
               type="text"
@@ -424,7 +419,6 @@ function FormPage() {
             className="p-2 border rounded"
           />
 
-          {/* Invoice Date */}
           <div className="col-span-1">
             <input
               type="text"
@@ -445,7 +439,6 @@ function FormPage() {
             className="p-2 border rounded"
           />
 
-          {/* Invoice Submitted On */}
           <div className="col-span-1">
             <input
               type="text"
@@ -482,7 +475,6 @@ function FormPage() {
           <div className="col-span-1">Remove</div>
         </div>
 
-        {/* Rows */}
         {rows.map((r, idx) => (
           <div
             key={idx}
@@ -586,6 +578,7 @@ function FormPage() {
           </div>
         ))}
 
+        {/* Bottom action buttons */}
         <div className="mt-3 flex items-center space-x-2">
           <button
             type="button"
@@ -598,7 +591,7 @@ function FormPage() {
 
           <button
             type="submit"
-            className="px-4 py-2 bg-gray-300 text-white rounded hover:bg-gray-400"
+            className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
             disabled={loading}
           >
             {isPoEditMode ? "Save PO & Chemicals" : "Save Chemicals"}
