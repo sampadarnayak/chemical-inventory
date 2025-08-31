@@ -259,5 +259,76 @@ html {
   height: 17px;
   vertical-align: middle;   /* extra safety */
 }
+/* Print styles for a professional, clean report */
+@media print {
+  /* Hide everything except heading + table */
+  body * {
+    visibility: hidden;
+  }
 
+  .list-container,
+  .list-container * {
+    visibility: visible;
+  }
 
+  /* Hide UI clutter */
+  .list-header div,
+  .filters-card,
+  .filters-actions,
+  .actions-cell {
+    display: none !important;
+  }
+}
+@media print {
+  .list-container {
+    border: none !important;
+    box-shadow: none !important;
+    background: #fff !important;
+  }
+}
+/* Print styles */
+@media print {
+  body {
+    margin: 0;
+    -webkit-print-color-adjust: exact;
+    background: #fff !important;
+  }
+
+  .list-container {
+    border: none !important; 
+    box-shadow: none !important;  /* 🚫 remove shadow */
+    background: #fff !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  
+  }
+
+  /* Hide buttons, filters etc */
+  .list-header button,
+  .filters-card,
+  .filters-actions {
+    display: none !important;
+  }
+
+  /* Table clean professional look */
+  .table-container {
+    overflow: visible !important;
+  }
+
+}
+.btn-print {
+  margin-left: 10px;
+  background-color: #1e1d2c; /* nice blue */
+  color: white;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 500;
+  transition: background-color 0.2s ease;
+}
+
+.btn-print:hover {
+  background-color:  #5a5963; /* darker blue on hover */
+}

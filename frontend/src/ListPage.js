@@ -153,13 +153,16 @@ function ListPage() {
         <h2>Chemical Inventory List</h2>
         <div>
           <button className="btn-add" onClick={() => navigate("/form")}>
-             Add New Chemical
+            Add New Chemical
+          </button>
+          <button className="btn-print no-print" onClick={() => window.print()}>
+            Print
           </button>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="filters-card">
+      <div className="filters-card no-print">
         <div className="filters-grid">
           <div className="filter-item">
             <label>Search</label>
@@ -286,14 +289,14 @@ function ListPage() {
               <th>Invoice Amount</th>
               <th>Invoice Submitted On</th>
               <th>Remarks</th>
-              <th>       </th>
+              <th> </th>
             </tr>
           </thead>
           <tbody>
             {filteredChemicals.length > 0 ? (
               filteredChemicals.map((c, idx) => (
                 <tr key={c.serial_no ?? idx}>
-                  <td>{c.serial_no ?? "-"}</td>
+                  <td>{idx + 1}</td>
                   <td>{c.name ?? "-"}</td>
                   <td>{c.sku ?? "-"}</td>
                   <td>{c.quantity ?? "-"}</td>
@@ -310,7 +313,7 @@ function ListPage() {
                   <td>{c.invoiceamount ?? "-"}</td>
                   <td>{formatDate(c.invoice_submitted_on)}</td>
                   <td>{c.remarks ?? "-"}</td>
-                  <td className="actions-cell">
+                  <td className="actions-cell no-print">
                     <Edit className="icon edit-icon" onClick={() => handleEdit(c)} />
                     <Trash2 className="icon delete-icon" onClick={() => handleDelete(c.serial_no)} />
                   </td>
