@@ -67,6 +67,7 @@ function FormPage() {
 
   const makeEmptyRow = (serial, po) => ({
     serial_no: serial,
+    display_no: po.display_no || "",
     name: "",
     sku: "",
     quantity: "",
@@ -117,11 +118,15 @@ try {
         setLoading(true);
         try {
           const all = await fetchAllChemicals();
+          all.sort((a, b) => Number(a.serial_no) - Number(b.serial_no));
           const samePo = all.filter((c) => (c.ponumber || "") === po);
 
           if (samePo.length > 0) {
-            const mapped = samePo.map((c) => ({
+            const mapped = samePo.map((c) => {
+              const display_no = all.findIndex((x) => x.serial_no === c.serial_no) + 1;
+              return{
               serial_no: c.serial_no ?? "",
+              display_no,
               name: c.name ?? "",
               sku: c.sku ?? "",
               quantity: c.quantity ?? "",
@@ -149,7 +154,8 @@ try {
                 ? new Date(c.invoice_submitted_on).toISOString().split("T")[0]
                 : "",
               remarks: c.remarks ?? "",
-            }));
+            };
+          });
 
             const first = mapped[0];
             setPoFields({
@@ -243,18 +249,27 @@ try {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chemicalToEdit]);
 
-  const addRow = () => {
+ const addRow = () => {
   setRows((prev) => {
-    // Look at the largest serial_no currently in the rows
-    const maxSerialInRows = prev.reduce(
-      (m, r) => Math.max(m, Number(r.serial_no) || 0),
+    // Find the current highest display number
+    const maxDisplay = prev.reduce(
+      (m, r) => Math.max(m, Number(r.display_no ?? r.serial_no) || 0),
       0
     );
-    const nextSerial = maxSerialInRows + 1;
-    return [...prev, makeEmptyRow(nextSerial, poFields)];
+    const nextDisplay = maxDisplay + 1;
+
+    // Create the new row
+    const newRow = makeEmptyRow("", { ...poFields });
+    newRow.display_no = nextDisplay;
+
+    // Insert new row in correct order instead of pushing to the end
+    const updated = [...prev, newRow].sort(
+      (a, b) => Number(a.display_no ?? a.serial_no) - Number(b.display_no ?? b.serial_no)
+    );
+
+    return updated;
   });
 };
-
   const removeRow = (idx) => {
     setRows((r) => r.filter((_, i) => i !== idx));
   };
@@ -483,7 +498,7 @@ try {
             <div className="col-span-1">
               <input
                 name={`serial_no_${idx}`}
-                value={r.serial_no}
+                value={r.display_no ?? r.serial_no}
                 placeholder="SL"
                 className="p-1 border rounded w-full"
                 readOnly
