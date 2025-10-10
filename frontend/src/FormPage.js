@@ -370,7 +370,10 @@ try {
 
     const newRows = payloadRows.filter((r) => !r.serial_no); // no serial → new chemical
     if (newRows.length > 0) {
-      await axios.post(`${API_BASE_URL}/chemicals`, { chemicals: newRows });
+      const rowsWithSerial = newRows.map((r) => ({
+        ...r,
+      serial_no: r.display_no}));
+      await axios.post(`${API_BASE_URL}/chemicals`, { chemicals: rowsWithSerial });
     }
 
     await Promise.allSettled(updatePromises);
