@@ -23,10 +23,10 @@ function LoginPage({ setIsLoggedIn }) {
     <div className="login-wrap">
       {/* Brand / Title */}
       <div className="brand">
-        <div className="brand-mark">🧪</div>
+        
         <div className="brand-text">
-          <h1>Inventory</h1>
-          <p>Chemical Inventory Management</p>
+          <h1>e-INVENTRA</h1>
+        
         </div>
       </div>
 

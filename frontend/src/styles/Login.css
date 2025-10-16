@@ -31,9 +31,10 @@
   font-size: 46px;
   line-height: 1.1;
   color: #111827; /* black */
-  letter-spacing: 0.2px;
-  font-weight: 800;
-  font-family: 'Times New Roman', Times, serif;
+  letter-spacing: 0.4px;
+  font-weight: 500;
+  font-family: fantasy;
+  font-style: italic;
 }
 .brand-text p {
   margin: 2px 0 0 0;
@@ -135,4 +136,3 @@
   margin-top: 80px;
   margin-right: 30px; /* push down only the brand + card */
 }
-
